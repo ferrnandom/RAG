@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG — stage zero</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 3rem auto;
+           padding: 0 1rem; line-height: 1.6; }
+    form { display: flex; gap: .5rem; }
+    input { flex: 1; padding: .6rem .8rem; font: inherit;
+            border: 1px solid #ccc; border-radius: 6px; }
+    button { padding: .6rem 1.2rem; font: inherit; cursor: pointer;
+             border: 0; border-radius: 6px; background: #1a1a1a; color: white; }
+    button[disabled] { opacity: .5; cursor: not-allowed; }
+    #answer { white-space: pre-wrap; margin-top: 2rem; }
+    .source { font-size: .875rem; color: #555; }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>Ask the documents</h1>
+
+  <form id="form">
+    <input id="q" placeholder="How does backpropagation compute gradients?" required />
+    <button id="btn" type="submit">Ask</button>
+  </form>
+
+  <div id="answer"></div>
+  <div id="sources"></div>
+
+  <script>
+    const API = "http://127.0.0.1:8000";
+
+    const form    = document.getElementById("form");
+    const input   = document.getElementById("q");
+    const button  = document.getElementById("btn");
+    const answer  = document.getElementById("answer");
+    const sources = document.getElementById("sources");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();              // stop the browser reloading the page
+
+      // --- enter the loading state ---
+      button.disabled = true;
+      button.textContent = "Thinking…";
+      answer.textContent = "";
+      answer.className = "";
+      sources.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API}/answer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: input.value }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+
+        // --- success state ---
+        answer.textContent = data.answer;
+        sources.innerHTML = data.sources
+          .map((s) => `<div class="source">[${s.citation}] ${s.source}
+                       — pages ${s.page_numbers.join(", ") || "n/a"}</div>`)
+          .join("");
+      } catch (err) {
+        // --- error state ---
+        answer.className = "error";
+        answer.textContent = `Request failed: ${err.message}`;
+      } finally {
+        // --- always leave the loading state ---
+        button.disabled = false;
+        button.textContent = "Ask";
+      }
+    });
+  </script>
+</body>
+</html>
